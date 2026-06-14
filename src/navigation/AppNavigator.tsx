@@ -7,6 +7,7 @@ import InterestScreen from "../screens/InterestScreen";
 import DashboardScreen from "../screens/DashboardScreen";
 import BottomTabs from "./BottomTabs";
 import InstagramConnectScreen from "../screens/InstagramConnectScreen";
+import CreatorReviewScreen from "../screens/CreatorReviewScreen";
 
 const Stack = createNativeStackNavigator();
 
@@ -33,6 +34,11 @@ export default function AppNavigator() {
                 <Stack.Screen
                     name="Interests"
                     component={InterestScreen}
+                />
+
+                <Stack.Screen
+                    name="CreatorReview"
+                    component={CreatorReviewScreen}
                 />
 
                 <Stack.Screen

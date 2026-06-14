@@ -311,7 +311,10 @@ export default function InterestScreen({
                             );
 
                             navigation.navigate(
-                                "Dashboard"
+                                "CreatorReview",
+                                {
+                                    interests: selected,
+                                }
                             );
                         } catch (
                         err

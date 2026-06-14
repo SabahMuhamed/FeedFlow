@@ -1,7 +1,14 @@
+
 import React, {
     useEffect,
     useState,
+    useCallback,
 } from "react";
+
+import {
+    useFocusEffect,
+
+} from "@react-navigation/native";
 
 import {
     View,
@@ -10,7 +17,15 @@ import {
     TouchableOpacity,
 } from "react-native";
 
-import { usePreferences } from "../store/usePreferences";
+import {
+    getAnalytics,
+    getAutomationStatus,
+} from "../services/api";
+
+import {
+    usePreferences,
+} from "../store/usePreferences";
+
 import {
     getUsername,
 } from "../services/storage";
@@ -18,37 +33,118 @@ import {
 export default function DashboardScreen({
     navigation,
 }: any) {
+
     const [username, setUsername] =
         useState("");
+
+    const [analytics, setAnalytics] =
+        useState<any>(null);
+
+    const [automation, setAutomation] =
+        useState<any>(null);
+
+    const [logs, setLogs] =
+        useState<any[]>([]);
+
+    const interests =
+        usePreferences(
+            (state) =>
+                state.interests
+        );
+
+    const loadData =
+        async () => {
+
+            const savedUser =
+                await getUsername();
+
+            if (!savedUser)
+                return;
+
+            setUsername(
+                savedUser
+            );
+
+            const analyticsData =
+                await getAnalytics(
+                    savedUser
+                );
+
+            const automationData =
+                await getAutomationStatus(
+                    savedUser
+                );
+
+            setAnalytics(
+                analyticsData
+            );
+
+            setAutomation(
+                automationData
+            );
+
+            setLogs(
+                analyticsData?.logs ||
+                []
+            );
+        };
+
+    useFocusEffect(
+        useCallback(() => {
+
+            loadData();
+
+        }, [])
+    );
+
     useEffect(() => {
 
-        const loadUser =
-            async () => {
+        const interval =
+            setInterval(() => {
 
-                const savedUser =
-                    await getUsername();
+                loadData();
 
-                if (savedUser) {
-                    setUsername(savedUser);
-                }
+            }, 5000);
 
-            };
-
-        loadUser();
+        return () =>
+            clearInterval(
+                interval
+            );
 
     }, []);
 
-    const interests = usePreferences(
-        (state) => state.interests
-    );
+    const formatDate =
+        (date: string) => {
 
-    const logs = [
-        "Viewed AI Reel",
-        "Saved Startup Post",
-        "Ignored Fitness Reel",
-        "Opened #ArtificialIntelligence",
-        "Followed Tech Creator",
-    ];
+            return new Date(
+                date
+            ).toLocaleString(
+                "en-GB",
+                {
+                    day: "2-digit",
+                    month: "2-digit",
+                    year: "numeric",
+                    hour: "2-digit",
+                    minute: "2-digit",
+                    second: "2-digit",
+                }
+            );
+        };
+
+    const alignment =
+        automation
+            ? Math.round(
+                (
+                    automation.completedJobs /
+                    Math.max(
+                        automation.completedJobs +
+                        automation.pendingJobs,
+                        1
+                    )
+                ) * 100
+            )
+            : 0;
+
     const instagram = {
         username: username
             ? `@${username}`
@@ -64,7 +160,8 @@ export default function DashboardScreen({
         <ScrollView
             style={{
                 flex: 1,
-                backgroundColor: "#0B0F19",
+                backgroundColor:
+                    "#0B0F19",
             }}
         >
             <View
@@ -77,7 +174,8 @@ export default function DashboardScreen({
                     style={{
                         color: "white",
                         fontSize: 30,
-                        fontWeight: "bold",
+                        fontWeight:
+                            "bold",
                     }}
                 >
                     FeedFlow
@@ -85,8 +183,10 @@ export default function DashboardScreen({
 
                 <View
                     style={{
-                        backgroundColor: "#141B2D",
-                        marginHorizontal: 20,
+                        backgroundColor:
+                            "#141B2D",
+                        marginHorizontal:
+                            20,
                         borderRadius: 24,
                         padding: 20,
                         marginBottom: 20,
@@ -94,7 +194,8 @@ export default function DashboardScreen({
                 >
                     <Text
                         style={{
-                            color: "#94A3B8",
+                            color:
+                                "#94A3B8",
                             fontSize: 14,
                         }}
                     >
@@ -103,8 +204,10 @@ export default function DashboardScreen({
 
                     <View
                         style={{
-                            flexDirection: "row",
-                            alignItems: "center",
+                            flexDirection:
+                                "row",
+                            alignItems:
+                                "center",
                             marginTop: 12,
                         }}
                     >
@@ -113,15 +216,18 @@ export default function DashboardScreen({
                                 width: 10,
                                 height: 10,
                                 borderRadius: 5,
-                                backgroundColor: "#10B981",
+                                backgroundColor:
+                                    "#10B981",
                                 marginRight: 8,
                             }}
                         />
 
                         <Text
                             style={{
-                                color: "#10B981",
-                                fontWeight: "bold",
+                                color:
+                                    "#10B981",
+                                fontWeight:
+                                    "bold",
                             }}
                         >
                             {instagram.status}
@@ -130,46 +236,58 @@ export default function DashboardScreen({
 
                     <Text
                         style={{
-                            color: "white",
+                            color:
+                                "white",
                             fontSize: 20,
-                            fontWeight: "bold",
+                            fontWeight:
+                                "bold",
                             marginTop: 10,
                         }}
                     >
-                        {instagram.username}
+                        {
+                            instagram.username
+                        }
                     </Text>
 
                     <Text
                         style={{
-                            color: "#94A3B8",
+                            color:
+                                "#94A3B8",
                             marginTop: 8,
                         }}
                     >
-                        {instagram.lastSync}
+                        {
+                            instagram.lastSync
+                        }
                     </Text>
                 </View>
 
                 <Text
                     style={{
-                        color: "#94A3B8",
+                        color:
+                            "#94A3B8",
                         marginTop: 5,
                     }}
                 >
-                    Personalizing your Instagram experience
+                    Personalizing your
+                    Instagram experience
                 </Text>
             </View>
 
             <View
                 style={{
-                    paddingHorizontal: 20,
+                    paddingHorizontal:
+                        20,
                     marginBottom: 20,
                 }}
             >
                 <Text
                     style={{
-                        color: "white",
+                        color:
+                            "white",
                         fontSize: 20,
-                        fontWeight: "bold",
+                        fontWeight:
+                            "bold",
                     }}
                 >
                     Your Interests
@@ -177,33 +295,43 @@ export default function DashboardScreen({
 
                 <Text
                     style={{
-                        color: "#7C3AED",
+                        color:
+                            "#7C3AED",
                         marginTop: 10,
                     }}
                 >
                     {interests.length > 0
-                        ? interests.join(", ")
+                        ? interests.join(
+                            ", "
+                        )
                         : "No interests selected"}
                 </Text>
             </View>
 
             <TouchableOpacity
                 onPress={() =>
-                    navigation.navigate("Interests")
+                    navigation.navigate(
+                        "Interests"
+                    )
                 }
                 style={{
-                    backgroundColor: "#7C3AED",
-                    marginHorizontal: 20,
+                    backgroundColor:
+                        "#7C3AED",
+                    marginHorizontal:
+                        20,
                     marginBottom: 20,
                     padding: 16,
                     borderRadius: 16,
-                    alignItems: "center",
+                    alignItems:
+                        "center",
                 }}
             >
                 <Text
                     style={{
-                        color: "white",
-                        fontWeight: "bold",
+                        color:
+                            "white",
+                        fontWeight:
+                            "bold",
                     }}
                 >
                     Edit Interests
@@ -212,56 +340,87 @@ export default function DashboardScreen({
 
             <View
                 style={{
-                    flexDirection: "row",
-                    justifyContent: "space-between",
-                    paddingHorizontal: 20,
+                    flexDirection:
+                        "row",
+                    justifyContent:
+                        "space-between",
+                    paddingHorizontal:
+                        20,
                 }}
             >
                 <View
                     style={{
-                        backgroundColor: "#141B2D",
+                        backgroundColor:
+                            "#141B2D",
                         width: "48%",
                         borderRadius: 20,
                         padding: 20,
                     }}
                 >
-                    <Text style={{ color: "#94A3B8" }}>
+                    <Text
+                        style={{
+                            color:
+                                "#94A3B8",
+                        }}
+                    >
                         Feed Alignment
                     </Text>
 
                     <Text
                         style={{
-                            color: "white",
+                            color:
+                                "white",
                             fontSize: 32,
-                            fontWeight: "bold",
+                            fontWeight:
+                                "bold",
                             marginTop: 10,
                         }}
                     >
-                        78%
+                        {alignment}%
                     </Text>
                 </View>
 
                 <View
                     style={{
-                        backgroundColor: "#141B2D",
+                        backgroundColor:
+                            "#141B2D",
                         width: "48%",
                         borderRadius: 20,
                         padding: 20,
                     }}
                 >
-                    <Text style={{ color: "#94A3B8" }}>
+                    <Text
+                        style={{
+                            color:
+                                "#94A3B8",
+                        }}
+                    >
                         Status
                     </Text>
 
                     <Text
                         style={{
-                            color: "#10B981",
+                            color:
+                                automation?.automationStatus ===
+                                    "running"
+                                    ? "#10B981"
+                                    : automation?.automationStatus ===
+                                        "completed"
+                                        ? "#3B82F6"
+                                        : automation?.automationStatus ===
+                                            "paused"
+                                            ? "#F59E0B"
+                                            : "#EF4444",
                             fontSize: 24,
-                            fontWeight: "bold",
+                            fontWeight:
+                                "bold",
                             marginTop: 10,
                         }}
                     >
-                        Active
+                        {
+                            automation?.automationStatus ||
+                            "stopped"
+                        }
                     </Text>
                 </View>
             </View>
@@ -269,59 +428,114 @@ export default function DashboardScreen({
             <View
                 style={{
                     margin: 20,
-                    backgroundColor: "#141B2D",
+                    backgroundColor:
+                        "#141B2D",
                     borderRadius: 20,
                     padding: 20,
                 }}
             >
-                <Text style={{ color: "#94A3B8" }}>
+                <Text
+                    style={{
+                        color:
+                            "#94A3B8",
+                    }}
+                >
                     Actions Today
                 </Text>
 
                 <Text
                     style={{
-                        color: "white",
+                        color:
+                            "white",
                         fontSize: 40,
-                        fontWeight: "bold",
+                        fontWeight:
+                            "bold",
                         marginTop: 10,
                     }}
                 >
-                    142
+                    {
+                        analytics?.actionsToday ||
+                        0
+                    }
                 </Text>
             </View>
 
             <View
                 style={{
-                    marginHorizontal: 20,
+                    marginHorizontal:
+                        20,
                     marginBottom: 30,
                 }}
             >
                 <Text
                     style={{
-                        color: "white",
+                        color:
+                            "white",
                         fontSize: 22,
-                        fontWeight: "bold",
+                        fontWeight:
+                            "bold",
                         marginBottom: 15,
                     }}
                 >
                     Recent Activity
                 </Text>
 
-                {logs.map((log, index) => (
-                    <View
-                        key={index}
-                        style={{
-                            backgroundColor: "#141B2D",
-                            padding: 16,
-                            borderRadius: 16,
-                            marginBottom: 12,
-                        }}
-                    >
-                        <Text style={{ color: "white" }}>
-                            {log}
-                        </Text>
-                    </View>
-                ))}
+                {[...logs]
+                    .sort(
+                        (a, b) =>
+                            new Date(
+                                b.created_at
+                            ).getTime() -
+                            new Date(
+                                a.created_at
+                            ).getTime()
+                    )
+                    .slice(0, 10)
+                    .map(
+                        (
+                            log,
+                            index
+                        ) => (
+                            <View
+                                key={
+                                    index
+                                }
+                                style={{
+                                    backgroundColor:
+                                        "#141B2D",
+                                    padding: 16,
+                                    borderRadius: 16,
+                                    marginBottom: 12,
+                                }}
+                            >
+                                <Text
+                                    style={{
+                                        color:
+                                            "white",
+                                    }}
+                                >
+                                    {
+                                        log.action
+                                    }
+                                    {" @"}
+                                    {
+                                        log.creator_username
+                                    }
+                                </Text>
+                                <Text
+                                    style={{
+                                        color: "#94A3B8",
+                                        marginTop: 5,
+                                        fontSize: 12,
+                                    }}
+                                >
+                                    {formatDate(
+                                        log.created_at
+                                    )}
+                                </Text>
+                            </View>
+                        )
+                    )}
             </View>
         </ScrollView>
     );

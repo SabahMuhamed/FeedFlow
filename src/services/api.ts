@@ -59,3 +59,167 @@ export async function getPreferences(
 
     return response.json();
 }
+export async function getCreators(
+    interest: string
+) {
+
+    const response =
+        await fetch(
+            `${API_URL}/creators/${interest}`
+        );
+
+    return response.json();
+}
+export async function saveCreators(
+    instagramUsername: string,
+    creators: any[]
+) {
+
+    const response =
+        await fetch(
+            `${API_URL}/creators/save`,
+            {
+                method: "POST",
+                headers: {
+                    "Content-Type":
+                        "application/json",
+                },
+                body: JSON.stringify({
+                    instagram_username:
+                        instagramUsername,
+                    creators,
+                }),
+            }
+        );
+
+    return response.json();
+}
+export async function generateJobs(
+    username: string
+) {
+    const response =
+        await fetch(
+            `${API_URL}/automation/generate`,
+            {
+                method: "POST",
+                headers: {
+                    "Content-Type":
+                        "application/json",
+                },
+                body: JSON.stringify({
+                    instagram_username:
+                        username,
+                }),
+            }
+        );
+
+    return response.json();
+}
+export async function getAnalytics(
+    username: string
+) {
+
+    const response =
+        await fetch(
+            `${API_URL}/analytics/${username}`
+        );
+
+    return response.json();
+}
+export async function getAutomationStatus(
+    username: string
+) {
+
+    const response =
+        await fetch(
+            `${API_URL}/automation/status/${username}`
+        );
+
+    return response.json();
+}
+
+export async function generateAutomation(
+    instagram_username: string
+) {
+    const response =
+        await fetch(
+            `${API_URL}/automation/generate`,
+            {
+                method: "POST",
+                headers: {
+                    "Content-Type":
+                        "application/json",
+                },
+                body: JSON.stringify({
+                    instagram_username,
+                }),
+            }
+        );
+
+    return response.json();
+}
+export async function pauseAutomation(
+    instagram_username: string
+) {
+
+    const response =
+        await fetch(
+            `${API_URL}/automation/pause`,
+            {
+                method: "POST",
+                headers: {
+                    "Content-Type":
+                        "application/json",
+                },
+                body: JSON.stringify({
+                    instagram_username,
+                }),
+            }
+        );
+
+    return response.json();
+}
+
+export async function resumeAutomation(
+    instagram_username: string
+) {
+
+    const response =
+        await fetch(
+            `${API_URL}/automation/resume`,
+            {
+                method: "POST",
+                headers: {
+                    "Content-Type":
+                        "application/json",
+                },
+                body: JSON.stringify({
+                    instagram_username,
+                }),
+            }
+        );
+
+    return response.json();
+}
+
+export async function stopAutomation(
+    instagram_username: string
+) {
+
+    const response =
+        await fetch(
+            `${API_URL}/automation/stop`,
+            {
+                method: "POST",
+                headers: {
+                    "Content-Type":
+                        "application/json",
+                },
+                body: JSON.stringify({
+                    instagram_username,
+                }),
+            }
+        );
+
+    return response.json();
+}
