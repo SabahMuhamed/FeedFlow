@@ -14,7 +14,7 @@ import {
 import {
     getAutomationStatus,
     getAnalytics,
-    generateAutomation,
+    generateJobs,
     pauseAutomation,
     resumeAutomation,
     stopAutomation,
@@ -40,6 +40,24 @@ export default function AutomationScreen() {
         loading,
         setLoading,
     ] = useState(true);
+
+    const [
+        autoCycleEnabled,
+        setAutoCycleEnabled,
+    ] = useState(false);
+
+    const [
+        cycleInterval,
+        setCycleInterval,
+    ] = useState(1);
+
+    const intervals = [
+        1,
+        2,
+        3,
+        4,
+        5,
+    ];
 
     useEffect(() => {
 
@@ -407,6 +425,105 @@ export default function AutomationScreen() {
 
             <View
                 style={{
+                    backgroundColor:
+                        "#141B2D",
+                    marginHorizontal: 20,
+                    marginTop: 20,
+                    borderRadius: 20,
+                    padding: 20,
+                }}
+            >
+                <Text
+                    style={{
+                        color: "white",
+                        fontSize: 18,
+                        fontWeight: "bold",
+                    }}
+                >
+                    Auto Generate Cycles
+                </Text>
+
+                <TouchableOpacity
+                    onPress={() =>
+                        setAutoCycleEnabled(
+                            !autoCycleEnabled
+                        )
+                    }
+                    style={{
+                        backgroundColor:
+                            autoCycleEnabled
+                                ? "#10B981"
+                                : "#374151",
+                        padding: 14,
+                        borderRadius: 12,
+                        marginTop: 15,
+                    }}
+                >
+                    <Text
+                        style={{
+                            color: "white",
+                            textAlign: "center",
+                        }}
+                    >
+                        {autoCycleEnabled
+                            ? "Enabled"
+                            : "Disabled"}
+                    </Text>
+                </TouchableOpacity>
+
+                <Text
+                    style={{
+                        color: "#94A3B8",
+                        marginTop: 20,
+                        marginBottom: 10,
+                    }}
+                >
+                    Generate Every
+                </Text>
+
+                <View
+                    style={{
+                        flexDirection: "row",
+                        flexWrap: "wrap",
+                    }}
+                >
+                    {intervals.map(
+                        (hour) => (
+                            <TouchableOpacity
+                                key={hour}
+                                onPress={() =>
+                                    setCycleInterval(
+                                        hour
+                                    )
+                                }
+                                style={{
+                                    backgroundColor:
+                                        cycleInterval ===
+                                            hour
+                                            ? "#7C3AED"
+                                            : "#0B0F19",
+                                    paddingVertical: 10,
+                                    paddingHorizontal: 14,
+                                    borderRadius: 12,
+                                    marginRight: 8,
+                                    marginBottom: 8,
+                                }}
+                            >
+                                <Text
+                                    style={{
+                                        color: "white",
+                                    }}
+                                >
+                                    {hour}h
+                                </Text>
+                            </TouchableOpacity>
+                        )
+                    )}
+                </View>
+            </View>
+
+            <View
+                style={{
                     flexDirection:
                         "row",
                     justifyContent:
@@ -586,12 +703,16 @@ export default function AutomationScreen() {
             </View>
 
             {(
-                automation?.automationStatus ===
+                automation?.automationStatus
+                    ?.toLowerCase() ===
                 "completed" ||
-                automation?.automationStatus ===
+
+                automation?.automationStatus
+                    ?.toLowerCase() ===
                 "stopped"
             ) && (
                     <TouchableOpacity
+                        activeOpacity={0.8}
                         onPress={async () => {
 
                             try {
@@ -602,13 +723,18 @@ export default function AutomationScreen() {
                                 if (!username)
                                     return;
 
+                                console.log(
+                                    "GENERATING NEW CYCLE FOR:",
+                                    username
+                                );
+
                                 const result =
-                                    await generateAutomation(
+                                    await generateJobs(
                                         username
                                     );
 
                                 console.log(
-                                    "NEW CYCLE",
+                                    "GENERATE RESULT:",
                                     result
                                 );
 
@@ -639,6 +765,7 @@ export default function AutomationScreen() {
                             } catch (err) {
 
                                 console.log(
+                                    "GENERATE ERROR:",
                                     err
                                 );
 

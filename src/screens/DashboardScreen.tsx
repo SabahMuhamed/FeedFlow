@@ -261,6 +261,11 @@ export default function DashboardScreen({
                         }
                     </Text>
                 </View>
+                <TouchableOpacity>
+                    <Text>
+                        Reconnect Instagram
+                    </Text>
+                </TouchableOpacity>
 
                 <Text
                     style={{
