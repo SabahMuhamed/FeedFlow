@@ -1,36 +1,28 @@
 import React, { useState, useRef, useEffect } from "react";
+import { View, Text, ScrollView, TouchableOpacity, Alert, ActivityIndicator } from "react-native";
 import {
-    View,
-    Text,
-    TouchableOpacity,
-    ActivityIndicator,
-    TextInput,
-    Alert,
-    ScrollView,
-} from "react-native";
-import {
-    connectInstagramSession,
-    getInstagramSessionStatus,
-    submitChallenge,
-    disconnectInstagramSession,
+    connectInstagramSession, getInstagramSessionStatus,
+    submitChallenge, disconnectInstagramSession,
 } from "../services/api";
-import { saveUsername, getUserData } from "../services/storage";
+import { saveUsername } from "../services/storage";
+import { T } from "../services/theme";
+import { Card, SectionLabel, Btn, Badge, StatusRow, Input, Header } from "../components/ui";
 
-const STATUS_CONFIG: Record<string, { color: string; label: string }> = {
-    disconnected: { color: "#EF4444", label: "Disconnected" },
-    connecting: { color: "#F59E0B", label: "Connecting..." },
-    launching_browser: { color: "#F59E0B", label: "Launching browser..." },
-    checking_session: { color: "#F59E0B", label: "Checking saved session..." },
-    session_expired: { color: "#F59E0B", label: "Session expired, logging in..." },
-    navigating_to_login: { color: "#F59E0B", label: "Opening Instagram login..." },
-    logging_in: { color: "#F59E0B", label: "Logging in..." },
-    challenge_required: { color: "#F59E0B", label: "Verification required" },
-    connected: { color: "#10B981", label: "Connected" },
-    login_failed: { color: "#EF4444", label: "Login Failed" },
+const STATUS_CONFIG: Record<string, string> = {
+    disconnected: "Disconnected",
+    connecting: "Connecting...",
+    launching_browser: "Launching browser...",
+    checking_session: "Checking saved session...",
+    session_expired: "Session expired, logging in...",
+    navigating_to_login: "Opening Instagram login...",
+    logging_in: "Logging in...",
+    challenge_required: "Verification required",
+    connected: "Connected",
+    login_failed: "Login Failed",
 };
 
 export default function InstagramConnectScreen({ navigation }: any) {
-    const [status, setStatus] = useState<string>("disconnected");
+    const [status, setStatus] = useState("disconnected");
     const [username, setUsername] = useState("");
     const [password, setPassword] = useState("");
     const [showPassword, setShowPassword] = useState(false);
@@ -42,122 +34,77 @@ export default function InstagramConnectScreen({ navigation }: any) {
     const [isProcessing, setIsProcessing] = useState(false);
     const pollRef = useRef<any>(null);
 
-    // Cleanup polling on unmount
-    useEffect(() => {
-        return () => {
-            if (pollRef.current) clearInterval(pollRef.current);
-        };
-    }, []);
+    useEffect(() => () => { if (pollRef.current) clearInterval(pollRef.current); }, []);
 
     const startPolling = (user: string) => {
         if (pollRef.current) clearInterval(pollRef.current);
-
-        let pollCount = 0;
-        const MAX_POLLS = 30; // 30 * 2s = 60 seconds max wait
-
+        let count = 0;
         pollRef.current = setInterval(async () => {
-            pollCount++;
+            count++;
             try {
                 const result = await getInstagramSessionStatus(user);
-
                 if (result.connected) {
-                    // ✅ Connected successfully
                     setStatus("connected");
                     setConnectedUsername(user);
-                    setStatusMessage("Session active — Bot Ready");
-                    setErrorMessage("");
+                    setStatusMessage("Session active");
                     setIsProcessing(false);
-                    if (pollRef.current) clearInterval(pollRef.current);
+                    clearInterval(pollRef.current);
                     return;
                 }
-
                 if (result.status === "login_failed") {
-                    // ❌ Login failed — stop polling and show error
                     setStatus("login_failed");
                     setErrorMessage(result.error || "Login failed — check your credentials");
-                    setStatusMessage(result.error || "Login failed");
                     setIsProcessing(false);
-                    if (pollRef.current) clearInterval(pollRef.current);
+                    clearInterval(pollRef.current);
                     return;
                 }
-
                 if (result.status === "challenge_required") {
                     setStatus("challenge_required");
                     setShowChallengeInput(true);
-                    setStatusMessage("Instagram sent a verification code. Check your email or phone.");
-                    setErrorMessage("");
-                    // Don't stop polling — keep checking in case user submits code
+                    setStatusMessage("Check your email or phone for a code");
                     return;
                 }
-
-                // Still connecting — update status message
                 if (result.status && STATUS_CONFIG[result.status]) {
                     setStatus(result.status);
-                    setStatusMessage(STATUS_CONFIG[result.status].label);
+                    setStatusMessage(STATUS_CONFIG[result.status]);
                 }
-
-                // Timeout after max polls
-                if (pollCount >= MAX_POLLS) {
+                if (count >= 30) {
                     setStatus("login_failed");
-                    setErrorMessage("Connection timed out after 60 seconds. Try again.");
-                    setStatusMessage("Connection timed out");
+                    setErrorMessage("Timed out after 60 seconds. Try again.");
                     setIsProcessing(false);
-                    if (pollRef.current) clearInterval(pollRef.current);
+                    clearInterval(pollRef.current);
                 }
-            } catch (e) {
-                console.log("Poll error:", e);
-            }
+            } catch (e) { console.log("Poll error:", e); }
         }, 2000);
     };
 
     const handleConnect = async () => {
-        if (!username.trim()) {
-            Alert.alert("Missing Username", "Please enter your Instagram username.");
-            return;
-        }
-        if (!password.trim()) {
-            Alert.alert("Missing Password", "Please enter your Instagram password.");
-            return;
-        }
-
+        if (!username.trim()) { Alert.alert("Enter your Instagram username"); return; }
+        if (!password.trim()) { Alert.alert("Enter your Instagram password"); return; }
         setIsProcessing(true);
         setStatus("launching_browser");
         setStatusMessage("Starting browser session...");
         setErrorMessage("");
         setShowChallengeInput(false);
-        setConnectedUsername("");
-
         try {
-            const result = await connectInstagramSession(
-                username.trim(),
-                password.trim()
-            );
-
+            const result = await connectInstagramSession(username.trim(), password.trim());
             if (result.success) {
                 setStatus("connecting");
-                setStatusMessage("Connection initiated. Checking status...");
                 startPolling(username.trim());
             } else {
                 setStatus("login_failed");
                 setErrorMessage(result.error || "Connection failed");
-                setStatusMessage(result.error || "Connection failed");
                 setIsProcessing(false);
             }
-        } catch (err: any) {
-            console.log(err);
+        } catch {
             setStatus("disconnected");
-            setErrorMessage("Could not reach server. Check your backend connection.");
-            setStatusMessage("Server unreachable");
+            setErrorMessage("Could not reach server");
             setIsProcessing(false);
         }
     };
 
     const handleSubmitChallengeCode = async () => {
-        if (!challengeCode.trim()) {
-            Alert.alert("Missing Code", "Enter the verification code from your email or SMS.");
-            return;
-        }
-
+        if (!challengeCode.trim()) { Alert.alert("Enter the verification code"); return; }
         try {
             setStatusMessage("Verifying code...");
             const result = await submitChallenge(username.trim(), challengeCode.trim());
@@ -166,20 +113,15 @@ export default function InstagramConnectScreen({ navigation }: any) {
                 setChallengeCode("");
                 setStatus("connected");
                 setConnectedUsername(username.trim());
-                setStatusMessage("Verification successful!");
-                setErrorMessage("");
                 setIsProcessing(false);
-                if (pollRef.current) clearInterval(pollRef.current);
+                clearInterval(pollRef.current);
             } else {
-                Alert.alert("Verification Failed", result.error || "Invalid code. Try again.");
+                Alert.alert("Invalid code", result.error || "Try again.");
             }
-        } catch (e: any) {
-            Alert.alert("Error", e.message);
-        }
+        } catch (e: any) { Alert.alert("Error", e.message); }
     };
 
     const handleRetry = () => {
-        // Clean up old session first
         disconnectInstagramSession(username.trim()).catch(() => { });
         setStatus("disconnected");
         setErrorMessage("");
@@ -188,321 +130,132 @@ export default function InstagramConnectScreen({ navigation }: any) {
         setIsProcessing(false);
     };
 
-    const getStatusColor = () => {
-        if (status === "login_failed") return "#EF4444";
-        if (status === "connected") return "#10B981";
-        if (status === "challenge_required") return "#F59E0B";
-        if (status.includes("ing") || status.includes("check")) return "#F59E0B";
-        return "#EF4444";
-    };
-
-    const getStatusLabel = () => {
-        return STATUS_CONFIG[status]?.label || status;
-    };
-
-    const isConnecting =
-        status !== "disconnected" &&
-        status !== "connected" &&
-        status !== "login_failed";
+    const isConnecting = !["disconnected", "connected", "login_failed"].includes(status);
 
     return (
         <ScrollView
-            style={{ flex: 1, backgroundColor: "#0B0F19" }}
-            contentContainerStyle={{
-                padding: 24,
-                justifyContent: "center",
-                flexGrow: 1,
-            }}
+            style={{ flex: 1, backgroundColor: T.bg }}
+            contentContainerStyle={{ flexGrow: 1, paddingHorizontal: 16, paddingBottom: 40 }}
         >
-            <Text
-                style={{
-                    color: "white",
-                    fontSize: 32,
-                    fontWeight: "bold",
-                    textAlign: "center",
-                }}
-            >
-                Connect Instagram
-            </Text>
+            <Header title="Connect Instagram" subtitle="Secure one-time browser session" />
 
-            <Text
-                style={{
-                    color: "#94A3B8",
-                    textAlign: "center",
-                    marginTop: 12,
-                }}
-            >
-                Connect your Instagram account using a secure browser session.
-            </Text>
-
-            {/* ─── Connection Card ─── */}
-            <View
-                style={{
-                    backgroundColor: "#141B2D",
-                    borderRadius: 24,
-                    padding: 24,
-                    marginTop: 40,
-                }}
-            >
-                <Text style={{ color: "#94A3B8", marginBottom: 8 }}>
-                    Instagram Username
-                </Text>
-                <TextInput
+            <Card>
+                <SectionLabel>Username</SectionLabel>
+                <Input
                     value={username}
                     onChangeText={setUsername}
                     autoCapitalize="none"
                     autoCorrect={false}
                     placeholder="your_instagram_username"
-                    placeholderTextColor="#64748B"
                     editable={status !== "connected"}
-                    style={{
-                        backgroundColor: "#0B0F19",
-                        color: "white",
-                        borderRadius: 12,
-                        padding: 14,
-                        opacity: status === "connected" ? 0.5 : 1,
-                    }}
                 />
 
-                <Text style={{ color: "#94A3B8", marginTop: 20, marginBottom: 8 }}>
-                    Password
-                </Text>
+                <SectionLabel>Password</SectionLabel>
                 <View style={{ position: "relative" }}>
-                    <TextInput
+                    <Input
                         value={password}
                         onChangeText={setPassword}
                         secureTextEntry={!showPassword}
-                        autoCapitalize="none"
                         placeholder="Your Instagram password"
-                        placeholderTextColor="#64748B"
+                        style={{ paddingRight: 50 }}
                         editable={status !== "connected"}
-                        style={{
-                            backgroundColor: "#0B0F19",
-                            color: "white",
-                            borderRadius: 12,
-                            padding: 14,
-                            paddingRight: 50,
-                            opacity: status === "connected" ? 0.5 : 1,
-                        }}
                     />
                     <TouchableOpacity
                         onPress={() => setShowPassword(!showPassword)}
-                        style={{ position: "absolute", right: 12, top: 12 }}
+                        style={{ position: "absolute", right: 12, top: 10 }}
                     >
-                        <Text style={{ color: "#64748B", fontSize: 12 }}>
-                            {showPassword ? "HIDE" : "SHOW"}
+                        <Text style={{ color: T.muted, fontSize: 11 }}>
+                            {showPassword ? "hide" : "show"}
                         </Text>
                     </TouchableOpacity>
                 </View>
-
-                <Text style={{ color: "#64748B", fontSize: 11, marginTop: 6 }}>
-                    Your password is used once for browser login and is never stored.
+                <Text style={{ color: T.hint, fontSize: 11, marginBottom: 14 }}>
+                    Used once — never stored on our servers
                 </Text>
 
-                {/* ─── Status Section ─── */}
-                <Text style={{ color: "#94A3B8", marginTop: 24 }}>Status</Text>
-
-                <View style={{ flexDirection: "row", alignItems: "center", marginTop: 8 }}>
-                    <View
-                        style={{
-                            width: 10,
-                            height: 10,
-                            borderRadius: 5,
-                            backgroundColor: getStatusColor(),
-                            marginRight: 8,
-                        }}
-                    />
-                    <Text
-                        style={{
-                            color: getStatusColor(),
-                            fontSize: 16,
-                            fontWeight: "bold",
-                        }}
-                    >
-                        {getStatusLabel()}
-                    </Text>
-                </View>
-
-                {/* Status message */}
+                <SectionLabel>Status</SectionLabel>
+                <StatusRow status={status} />
                 {statusMessage ? (
-                    <Text
-                        style={{
-                            color:
-                                status === "login_failed" ? "#EF4444" : "#94A3B8",
-                            fontSize: 12,
-                            marginTop: 6,
-                        }}
-                    >
+                    <Text style={{ color: T.muted, fontSize: 11, marginTop: 4 }}>
                         {statusMessage}
                     </Text>
                 ) : null}
 
-                {/* ❌ Error message — shown when login fails */}
-                {status === "login_failed" && errorMessage ? (
-                    <View
-                        style={{
-                            backgroundColor: "rgba(239, 68, 68, 0.1)",
-                            borderWidth: 1,
-                            borderColor: "rgba(239, 68, 68, 0.3)",
-                            borderRadius: 12,
-                            padding: 14,
-                            marginTop: 12,
-                        }}
-                    >
-                        <Text style={{ color: "#EF4444", fontSize: 13, fontWeight: "600" }}>
-                            Login Failed
+                {status === "login_failed" && (
+                    <View style={{
+                        backgroundColor: T.red.bg,
+                        borderWidth: 0.5,
+                        borderColor: T.red.border,
+                        borderRadius: 8,
+                        padding: 12,
+                        marginTop: 10,
+                    }}>
+                        <Text style={{ color: T.red.text, fontSize: 12, fontWeight: "500" }}>
+                            Login failed
                         </Text>
-                        <Text style={{ color: "#FCA5A5", fontSize: 12, marginTop: 4 }}>
+                        <Text style={{ color: "#FCA5A5", fontSize: 11, marginTop: 3 }}>
                             {errorMessage}
                         </Text>
-                        <Text style={{ color: "#FCA5A5", fontSize: 11, marginTop: 8 }}>
-                            Make sure your Instagram username and password are correct.
-                            If 2FA is enabled, you'll see a verification prompt.
-                        </Text>
                     </View>
-                ) : null}
-
-                {/* Loading spinner */}
-                {isConnecting && (
-                    <ActivityIndicator
-                        size="large"
-                        color="#7C3AED"
-                        style={{ marginTop: 20 }}
-                    />
                 )}
 
-                {/* Connected info */}
+                {isConnecting && (
+                    <ActivityIndicator size="small" color={T.purple.text} style={{ marginTop: 14 }} />
+                )}
+
                 {status === "connected" && (
-                    <>
-                        <Text
-                            style={{
-                                color: "#10B981",
-                                marginTop: 15,
-                                fontSize: 16,
-                                fontWeight: "bold",
-                            }}
-                        >
+                    <View style={{ marginTop: 10 }}>
+                        <Text style={{ color: T.text, fontSize: 14, fontWeight: "500" }}>
                             @{connectedUsername || username}
                         </Text>
-                        <Text style={{ color: "#64748B", marginTop: 5 }}>
-                            Session Active — Bot Ready
-                        </Text>
-                    </>
-                )}
-
-                {/* ─── Challenge Input (2FA) ─── */}
-                {showChallengeInput && (
-                    <View style={{ marginTop: 20 }}>
-                        <Text
-                            style={{
-                                color: "#F59E0B",
-                                marginBottom: 10,
-                                fontWeight: "bold",
-                            }}
-                        >
-                            Verification Code Required
-                        </Text>
-                        <Text style={{ color: "#94A3B8", fontSize: 12, marginBottom: 10 }}>
-                            Instagram sent a code to your email or phone. Enter it below to complete login.
-                        </Text>
-                        <TextInput
-                            value={challengeCode}
-                            onChangeText={setChallengeCode}
-                            placeholder="Enter verification code"
-                            placeholderTextColor="#64748B"
-                            keyboardType="number-pad"
-                            style={{
-                                backgroundColor: "#0B0F19",
-                                color: "white",
-                                borderRadius: 12,
-                                padding: 14,
-                            }}
-                        />
-                        <TouchableOpacity
-                            onPress={handleSubmitChallengeCode}
-                            style={{
-                                backgroundColor: "#F59E0B",
-                                padding: 14,
-                                borderRadius: 12,
-                                alignItems: "center",
-                                marginTop: 10,
-                            }}
-                        >
-                            <Text style={{ color: "black", fontWeight: "bold" }}>
-                                Submit Code
-                            </Text>
-                        </TouchableOpacity>
+                        <Badge label="Session active · bot ready" variant="success" />
                     </View>
+                )}
+            </Card>
+
+            {showChallengeInput && (
+                <Card style={{ borderColor: T.green.border }}>
+                    <SectionLabel>2FA Verification</SectionLabel>
+                    <Text style={{ color: T.muted, fontSize: 12, marginBottom: 8 }}>
+                        Enter the code Instagram sent to your email or phone
+                    </Text>
+                    <Input
+                        value={challengeCode}
+                        onChangeText={setChallengeCode}
+                        placeholder="6-digit code"
+                        keyboardType="number-pad"
+                    />
+                    <Btn label="Submit code" variant="success" onPress={handleSubmitChallengeCode} />
+                </Card>
+            )}
+
+            <View style={{ marginTop: 4 }}>
+                {status === "connected" ? (
+                    <Btn
+                        label="Continue to FeedFlow setup"
+                        variant="success"
+                        onPress={async () => {
+                            await saveUsername(connectedUsername || username.trim());
+                            navigation.replace("Interests", {
+                                instagramUsername: connectedUsername || username.trim(),
+                            });
+                        }}
+                    />
+                ) : status === "login_failed" ? (
+                    <Btn label="Retry connection" variant="primary" onPress={handleRetry} />
+                ) : (
+                    <Btn
+                        label={isProcessing ? "Connecting..." : "Connect Instagram"}
+                        variant="primary"
+                        onPress={handleConnect}
+                        disabled={isProcessing}
+                    />
                 )}
             </View>
 
-            {/* ─── Action Buttons ─── */}
-            {status === "connected" ? (
-                <TouchableOpacity
-                    onPress={async () => {
-                        await saveUsername(connectedUsername || username.trim());
-                        navigation.replace("Interests", {
-                            instagramUsername: connectedUsername || username.trim(),
-                        });
-                    }}
-                    style={{
-                        backgroundColor: "#10B981",
-                        padding: 18,
-                        borderRadius: 18,
-                        alignItems: "center",
-                        marginTop: 30,
-                    }}
-                >
-                    <Text style={{ color: "white", fontWeight: "bold", fontSize: 16 }}>
-                        ✅ Continue to FeedFlow Setup
-                    </Text>
-                </TouchableOpacity>
-            ) : status === "login_failed" ? (
-                <TouchableOpacity
-                    onPress={handleRetry}
-                    style={{
-                        backgroundColor: "#7C3AED",
-                        padding: 18,
-                        borderRadius: 18,
-                        alignItems: "center",
-                        marginTop: 30,
-                    }}
-                >
-                    <Text style={{ color: "white", fontWeight: "bold", fontSize: 16 }}>
-                        🔄 Retry Connection
-                    </Text>
-                </TouchableOpacity>
-            ) : (
-                <TouchableOpacity
-                    onPress={handleConnect}
-                    disabled={isProcessing}
-                    style={{
-                        backgroundColor: isProcessing ? "#374151" : "#7C3AED",
-                        padding: 18,
-                        borderRadius: 18,
-                        alignItems: "center",
-                        marginTop: 30,
-                        opacity: isProcessing ? 0.6 : 1,
-                    }}
-                >
-                    <Text style={{ color: "white", fontWeight: "bold", fontSize: 16 }}>
-                        {isProcessing ? "⏳ Connecting..." : "🔗 Connect Instagram"}
-                    </Text>
-                </TouchableOpacity>
-            )}
-
-            {/* Help text */}
-            <Text
-                style={{
-                    color: "#374151",
-                    fontSize: 11,
-                    textAlign: "center",
-                    marginTop: 30,
-                    lineHeight: 18,
-                }}
-            >
-                Your credentials are used once inside an ephemeral browser session and are
-                never stored. The session cookie is encrypted and saved for future use.
+            <Text style={{ color: T.hint, fontSize: 11, textAlign: "center", marginTop: 20, lineHeight: 17 }}>
+                Credentials are used inside an ephemeral browser session and never stored.
+                The session cookie is encrypted for future use.
             </Text>
         </ScrollView>
     );

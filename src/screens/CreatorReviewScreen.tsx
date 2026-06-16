@@ -1,615 +1,202 @@
-import React, {
-    useEffect,
-    useState,
-} from "react";
+import React, { useEffect, useState } from "react";
+import { View, Text, ScrollView, TouchableOpacity, Alert } from "react-native";
+import { getCreators, saveCreators, generateJobs, verifyCreator } from "../services/api";
+import { getUsername, setOnboardingCompleted } from "../services/storage";
+import { T } from "../services/theme";
+import { Card, SectionLabel, Btn, Badge, Input, Header } from "../components/ui";
 
-import {
-    View,
-    Text,
-    ScrollView,
-    TouchableOpacity,
-    Alert,
-    TextInput,
-} from "react-native";
+const INTEREST_OPTIONS = ["Technology", "Cybersecurity", "AI", "Startups", "Gaming", "Finance", "Fitness"];
 
-import {
-    getCreators,
-    saveCreators,
-    generateJobs,
-    verifyCreator,
-} from "../services/api";
+export default function CreatorReviewScreen({ route, navigation }: any) {
+    const interests = route.params.interests;
 
-import {
-    getUsername,
-} from "../services/storage";
-
-export default function CreatorReviewScreen({
-    route,
-    navigation,
-}: any) {
-    const interests =
-        route.params.interests;
-
-    const [
-        creators,
-        setCreators,
-    ] = useState<any[]>([]);
-
-    const [
-        selectedCreators,
-        setSelectedCreators,
-    ] = useState<any[]>([]);
-
-    const [
-        creatorPreview,
-        setCreatorPreview,
-    ] = useState<any>(null);
-
-    const [
-        verifying,
-        setVerifying,
-    ] = useState(false);
-
-    const [newCreator, setNewCreator] =
-        useState("");
-
-    const [newInterest, setNewInterest] =
-        useState("Technology");
-
-    const interestOptions = [
-        "Technology ",
-        "Cybersecurity ",
-        "AI ",
-        "Startups ",
-        "Gaming ",
-        "Finance ",
-        "Fitness ",
-    ];
-
-    const verifyAndPreview =
-        async () => {
-
-            if (!newCreator.trim()) {
-
-                Alert.alert(
-                    "Enter Creator Username"
-                );
-
-                return;
-            }
-
-            try {
-
-                setVerifying(true);
-
-                const result =
-                    await verifyCreator(
-                        newCreator.trim()
-                    );
-
-                if (
-                    !result.success ||
-                    !result.exists
-                ) {
-
-                    Alert.alert(
-                        "Creator Not Found"
-                    );
-
-                    setCreatorPreview(
-                        null
-                    );
-
-                    return;
-                }
-
-                setCreatorPreview({
-                    username:
-                        newCreator.trim(),
-                });
-
-                Alert.alert(
-                    "Creator Verified"
-                );
-
-            } catch (err) {
-
-                Alert.alert(
-                    "Verification Failed"
-                );
-
-            } finally {
-
-                setVerifying(false);
-
-            }
-        };
-
-    const addCreator = () => {
-
-        if (!creatorPreview) {
-
-            Alert.alert(
-                "Verification Required",
-                "Please verify creator first."
-            );
-
-            return;
-        }
-
-        const exists =
-            selectedCreators.some(
-                (item) =>
-                    item.creator_username.toLowerCase() ===
-                    creatorPreview.username.toLowerCase()
-            );
-
-        if (exists) {
-
-            Alert.alert(
-                "Already Added"
-            );
-
-            return;
-        }
-
-        const creator = {
-            creator_username:
-                creatorPreview.username,
-            interest:
-                newInterest,
-        };
-
-        setCreators([
-            ...creators,
-            creator,
-        ]);
-
-        setSelectedCreators([
-            ...selectedCreators,
-            creator,
-        ]);
-
-        setCreatorPreview(
-            null
-        );
-
-        setNewCreator("");
-
-        Alert.alert(
-            "Success",
-            "Creator added"
-        );
-    };
+    const [creators, setCreators] = useState<any[]>([]);
+    const [selectedCreators, setSelectedCreators] = useState<any[]>([]);
+    const [creatorPreview, setCreatorPreview] = useState<any>(null);
+    const [verifying, setVerifying] = useState(false);
+    const [newCreator, setNewCreator] = useState("");
+    const [newInterest, setNewInterest] = useState("Technology");
 
     useEffect(() => {
-        const loadCreators =
-            async () => {
-                try {
-                    let allCreators: any[] =
-                        [];
-
-                    for (const interest of interests) {
-                        const result =
-                            await getCreators(
-                                interest
-                            );
-
-                        if (
-                            result.success
-                        ) {
-                            allCreators.push(
-                                ...result.data
-                            );
-                        }
-                    }
-
-                    setCreators(
-                        allCreators
-                    );
-
-                    setSelectedCreators(
-                        allCreators
-                    );
-                } catch (err) {
-                    console.log(err);
+        const load = async () => {
+            try {
+                let all: any[] = [];
+                for (const interest of interests) {
+                    const r = await getCreators(interest);
+                    if (r.success) all.push(...r.data);
                 }
-            };
-
-        loadCreators();
+                setCreators(all);
+                setSelectedCreators(all);
+            } catch (e) { console.log(e); }
+        };
+        load();
     }, []);
 
-    const toggleCreator = (
-        creator: any
-    ) => {
-        const exists =
-            selectedCreators.find(
-                (item) =>
-                    item.creator_username ===
-                    creator.creator_username
-            );
+    const verifyAndPreview = async () => {
+        if (!newCreator.trim()) { Alert.alert("Enter a username"); return; }
+        try {
+            setVerifying(true);
+            const result = await verifyCreator(newCreator.trim());
+            if (!result.success || !result.exists) {
+                Alert.alert("Creator Not Found");
+                setCreatorPreview(null);
+                return;
+            }
+            setCreatorPreview({ username: newCreator.trim() });
+        } catch { Alert.alert("Verification Failed"); }
+        finally { setVerifying(false); }
+    };
 
+    const addCreator = () => {
+        if (!creatorPreview) {
+            Alert.alert("Verify first", "Please verify the creator before adding.");
+            return;
+        }
+        const exists = selectedCreators.some(
+            (i) => i.creator_username.toLowerCase() === creatorPreview.username.toLowerCase()
+        );
+        if (exists) { Alert.alert("Already added"); return; }
+
+        const creator = {
+            creator_username: creatorPreview.username.trim(),
+            interest: newInterest.trim(),
+        };
+        setCreators((p) => [...p, creator]);
+        setSelectedCreators((p) => [...p, creator]);
+        setCreatorPreview(null);
+        setNewCreator("");
+        setNewInterest("Technology");
+    };
+
+    const toggleCreator = (creator: any) => {
+        const exists = selectedCreators.find((i) => i.creator_username === creator.creator_username);
         if (exists) {
-            setSelectedCreators(
-                selectedCreators.filter(
-                    (item) =>
-                        item.creator_username !==
-                        creator.creator_username
-                )
-            );
+            setSelectedCreators((p) => p.filter((i) => i.creator_username !== creator.creator_username));
         } else {
-            setSelectedCreators([
-                ...selectedCreators,
-                creator,
-            ]);
+            setSelectedCreators((p) => [...p, creator]);
         }
     };
 
-    const handleSaveCreators =
-        async () => {
-            try {
-                const username =
-                    await getUsername();
-
-                if (!username) {
-                    Alert.alert(
-                        "Error",
-                        "Username not found"
-                    );
-                    return;
-                }
-
-                const result =
-                    await saveCreators(
-                        username,
-                        selectedCreators
-                    );
-
-                console.log(
-                    "SAVE CREATORS RESPONSE"
-                );
-                console.log(result);
-
-                const jobsResult =
-                    await generateJobs(
-                        username
-                    );
-
-                console.log(
-                    "JOBS GENERATED"
-                );
-
-                console.log(
-                    jobsResult
-                );
-
-                navigation.navigate(
-                    "Dashboard"
-                );
-            } catch (err) {
-                console.log(err);
-
-                Alert.alert(
-                    "Error",
-                    "Failed to save creators"
-                );
-            }
-        };
+    const handleSave = async () => {
+        try {
+            const username = await getUsername();
+            if (!username) { Alert.alert("Username not found"); return; }
+            await saveCreators(username, selectedCreators);
+            await generateJobs(username);
+            await setOnboardingCompleted();
+            navigation.reset({ index: 0, routes: [{ name: "Dashboard" }] });
+        } catch {
+            Alert.alert("Error", "Failed to save creators");
+        }
+    };
 
     return (
-        <ScrollView
-            style={{
-                flex: 1,
-                backgroundColor:
-                    "#0B0F19",
-            }}
-        >
-            <View
-                style={{
-                    padding: 20,
-                    marginTop: 50,
-                }}
-            >
-                <Text
-                    style={{
-                        color: "white",
-                        fontSize: 30,
-                        fontWeight:
-                            "bold",
-                    }}
-                >
-                    Creator Review
-                </Text>
+        <ScrollView style={{ flex: 1, backgroundColor: T.bg }}>
+            <Header
+                title="Creator Review"
+                subtitle="Tap a creator to toggle selection"
+            />
 
-                <Text
-                    style={{
-                        color:
-                            "#94A3B8",
-                        marginTop: 10,
-                        marginBottom: 20,
-                    }}
-                >
-                    FeedFlow selected creators
-                    based on your interests.
-                    Tap a creator to remove
-                    or add them.
-                </Text>
+            <View style={{ paddingHorizontal: 16 }}>
 
-                <View
-                    style={{
-                        backgroundColor:
-                            "#141B2D",
-                        padding: 16,
-                        borderRadius: 16,
-                        marginBottom: 20,
-                    }}
-                >
-                    <Text
-                        style={{
-                            color: "white",
-                            fontSize: 18,
-                            fontWeight: "bold",
-                            marginBottom: 10,
-                        }}
-                    >
-                        Add Creator
-                    </Text>
-
-                    <TextInput
+                {/* Add creator card */}
+                <Card>
+                    <SectionLabel>Add Creator</SectionLabel>
+                    <Input
                         value={newCreator}
-                        onChangeText={
-                            setNewCreator
-                        }
+                        onChangeText={setNewCreator}
                         placeholder="creator_username"
-                        placeholderTextColor="#64748B"
-                        style={{
-                            backgroundColor:
-                                "#0B0F19",
-                            color: "white",
-                            padding: 14,
-                            borderRadius: 12,
-                        }}
+                        autoCapitalize="none"
+                    />
+                    <Btn
+                        label={verifying ? "Verifying..." : "Verify Creator"}
+                        variant="primary"
+                        onPress={verifyAndPreview}
+                        disabled={verifying}
                     />
 
-                    <TouchableOpacity
-                        onPress={
-                            verifyAndPreview
-                        }
-                        style={{
-                            backgroundColor:
-                                "#3B82F6",
-                            padding: 14,
-                            borderRadius: 12,
-                            marginTop: 12,
-                            alignItems:
-                                "center",
-                        }}
-                    >
-                        <Text
-                            style={{
-                                color: "white",
-                                fontWeight: "bold",
-                            }}
-                        >
-                            {verifying
-                                ? "Verifying..."
-                                : "Verify Creator"}
-                        </Text>
-                    </TouchableOpacity>
-
                     {creatorPreview && (
-                        <View
-                            style={{
-                                backgroundColor:
-                                    "#0B0F19",
-                                padding: 12,
-                                borderRadius: 12,
-                                marginTop: 12,
-                            }}
-                        >
-                            <Text
-                                style={{
-                                    color: "#10B981",
-                                    textAlign: "center",
-                                }}
-                            >
-                                ✓ Verified
-                            </Text>
-
-                            <Text
-                                style={{
-                                    color: "white",
-                                    textAlign: "center",
-                                    marginTop: 5,
-                                }}
-                            >
+                        <View style={{
+                            backgroundColor: T.bg,
+                            borderRadius: 8,
+                            padding: 10,
+                            alignItems: "center",
+                            marginBottom: 10,
+                            borderWidth: 0.5,
+                            borderColor: T.green.border,
+                        }}>
+                            <Text style={{ color: T.green.text, fontSize: 12 }}>✓ Verified</Text>
+                            <Text style={{ color: T.text, fontSize: 13, marginTop: 2 }}>
                                 @{creatorPreview.username}
                             </Text>
                         </View>
                     )}
-                    <Text
-                        style={{
-                            color: "#94A3B8",
-                            marginTop: 15,
-                            marginBottom: 10,
-                        }}
-                    >
-                        Category
-                    </Text>
 
-                    <View
-                        style={{
-                            flexDirection: "row",
-                            flexWrap: "wrap",
-                        }}
-                    >
-                        {interestOptions.map(
-                            (interest) => (
-                                <TouchableOpacity
-                                    key={interest}
-                                    onPress={() =>
-                                        setNewInterest(
-                                            interest
-                                        )
-                                    }
-                                    style={{
-                                        backgroundColor:
-                                            newInterest ===
-                                                interest
-                                                ? "#7C3AED"
-                                                : "#0B0F19",
-                                        paddingVertical: 8,
-                                        paddingHorizontal: 14,
-                                        borderRadius: 12,
-                                        marginRight: 8,
-                                        marginBottom: 8,
-                                    }}
-                                >
-                                    <Text
-                                        style={{
-                                            color:
-                                                "white",
-                                        }}
-                                    >
-                                        {interest}
-                                    </Text>
-                                </TouchableOpacity>
-                            )
-                        )}
-                    </View>
-
-                    <TouchableOpacity
-                        onPress={addCreator}
-                        style={{
-                            backgroundColor:
-                                "#10B981",
-                            padding: 14,
-                            borderRadius: 12,
-                            marginTop: 12,
-                            alignItems:
-                                "center",
-                        }}
-                    >
-                        <Text
-                            style={{
-                                color: "white",
-                                fontWeight: "bold",
-                            }}
-                        >
-                            Add Creator
-                        </Text>
-                    </TouchableOpacity>
-                </View>
-
-                {creators.map(
-                    (
-                        creator,
-                        index
-                    ) => {
-                        const isSelected =
-                            selectedCreators.find(
-                                (
-                                    item
-                                ) =>
-                                    item.creator_username ===
-                                    creator.creator_username
-                            );
-
-                        return (
+                    <SectionLabel>Category</SectionLabel>
+                    <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6, marginBottom: 10 }}>
+                        {INTEREST_OPTIONS.map((opt) => (
                             <TouchableOpacity
-                                key={
-                                    index
-                                }
-                                onPress={() =>
-                                    toggleCreator(
-                                        creator
-                                    )
-                                }
+                                key={opt}
+                                onPress={() => setNewInterest(opt)}
                                 style={{
-                                    backgroundColor:
-                                        isSelected
-                                            ? "#7C3AED"
-                                            : "#141B2D",
-                                    padding: 16,
-                                    borderRadius: 16,
-                                    marginTop: 15,
+                                    backgroundColor: newInterest === opt ? T.purple.bg : T.bg,
+                                    borderWidth: 0.5,
+                                    borderColor: newInterest === opt ? T.purple.border : T.border,
+                                    borderRadius: 6,
+                                    paddingVertical: 5,
+                                    paddingHorizontal: 10,
                                 }}
                             >
-                                <Text
-                                    style={{
-                                        color:
-                                            "white",
-                                        fontSize:
-                                            18,
-                                        fontWeight:
-                                            "bold",
-                                    }}
-                                >
-                                    @
-                                    {
-                                        creator.creator_username
-                                    }
-                                </Text>
-
-                                <Text
-                                    style={{
-                                        color:
-                                            "#E2E8F0",
-                                        marginTop:
-                                            5,
-                                    }}
-                                >
-                                    {
-                                        creator.interest
-                                    }
-                                </Text>
-
-                                <Text
-                                    style={{
-                                        color:
-                                            isSelected
-                                                ? "#D8B4FE"
-                                                : "#94A3B8",
-                                        marginTop:
-                                            8,
-                                    }}
-                                >
-                                    {isSelected
-                                        ? "✓ Selected"
-                                        : "Tap to Add"}
+                                <Text style={{
+                                    color: newInterest === opt ? T.purple.text : T.muted,
+                                    fontSize: 12,
+                                }}>
+                                    {opt}
                                 </Text>
                             </TouchableOpacity>
-                        );
-                    }
-                )}
+                        ))}
+                    </View>
 
-                <TouchableOpacity
-                    onPress={
-                        handleSaveCreators
-                    }
-                    style={{
-                        backgroundColor:
-                            "#10B981",
-                        padding: 18,
-                        borderRadius: 18,
-                        alignItems:
-                            "center",
-                        marginTop: 30,
-                        marginBottom: 40,
-                    }}
-                >
-                    <Text
-                        style={{
-                            color:
-                                "white",
-                            fontWeight:
-                                "bold",
-                            fontSize: 16,
-                        }}
-                    >
-                        Start Automation
-                    </Text>
-                </TouchableOpacity>
+                    <Btn label="Add Creator" variant="success" onPress={addCreator} />
+                </Card>
+
+                {/* Creator list */}
+                <SectionLabel>Creators ({creators.length})</SectionLabel>
+                {creators.map((creator, i) => {
+                    const isSelected = !!selectedCreators.find(
+                        (item) => item.creator_username === creator.creator_username
+                    );
+                    return (
+                        <TouchableOpacity
+                            key={i}
+                            onPress={() => toggleCreator(creator)}
+                            style={{
+                                backgroundColor: T.surface,
+                                borderRadius: 12,
+                                padding: 12,
+                                marginBottom: 7,
+                                borderWidth: 0.5,
+                                borderColor: isSelected ? T.purple.border : T.border,
+                            }}
+                        >
+                            <Text style={{ color: T.text, fontSize: 14, fontWeight: "500" }}>
+                                @{creator.creator_username}
+                            </Text>
+                            <Text style={{ color: T.muted, fontSize: 12, marginTop: 2 }}>
+                                {creator.interest}
+                            </Text>
+                            {isSelected
+                                ? <Badge label="✓ selected" variant="primary" />
+                                : <Text style={{ color: T.hint, fontSize: 11, marginTop: 5 }}>Tap to add</Text>
+                            }
+                        </TouchableOpacity>
+                    );
+                })}
+
+                <View style={{ marginTop: 8 }}>
+                    <Btn label="Start Automation" variant="success" onPress={handleSave} />
+                </View>
+                <View style={{ height: 40 }} />
             </View>
         </ScrollView>
     );

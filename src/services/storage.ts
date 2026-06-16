@@ -20,3 +20,24 @@ export async function removeUsername() {
         "instagram_username"
     );
 }
+
+export async function setOnboardingCompleted() {
+    await AsyncStorage.setItem(
+        "hasCompletedOnboarding",
+        "true"
+    );
+}
+
+export async function getOnboardingCompleted() {
+    return await AsyncStorage.getItem(
+        "hasCompletedOnboarding"
+    );
+}
+
+export async function clearOnboarding() {
+
+    await AsyncStorage.removeItem(
+        "hasCompletedOnboarding"
+    );
+
+}

@@ -1,126 +1,104 @@
-import React from "react";
-import {
-    View,
-    Text,
-    ScrollView,
-    Dimensions,
-} from "react-native";
-
+import React, { useEffect, useState } from "react";
+import { View, Text, ScrollView, Dimensions, ActivityIndicator } from "react-native";
 import { LineChart } from "react-native-chart-kit";
+import { getAnalytics } from "../services/api";
+import { getUsername } from "../services/storage";
+import { T } from "../services/theme";
+import { Card, SectionLabel, Header } from "../components/ui";
 
-const screenWidth = Dimensions.get("window").width;
+const W = Dimensions.get("window").width;
 
 export default function AnalyticsScreen() {
+    const [analytics, setAnalytics] = useState<any>(null);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        const load = async () => {
+            try {
+                const user = await getUsername();
+                if (!user) return;
+                setAnalytics(await getAnalytics(user));
+            } catch (e) { console.log(e); }
+            finally { setLoading(false); }
+        };
+        load();
+    }, []);
+
+    if (loading) {
+        return (
+            <View style={{ flex: 1, backgroundColor: T.bg, justifyContent: "center", alignItems: "center" }}>
+                <ActivityIndicator size="large" color={T.purple.text} />
+            </View>
+        );
+    }
+
+    const { actionsToday = 0, likes = 0, reels = 0, saves = 0, profiles = 0, follows = 0 } = analytics || {};
+
+    const STATS = [
+        { label: "Likes", value: likes },
+        { label: "Reels Watched", value: reels },
+        { label: "Posts Saved", value: saves },
+        { label: "Profiles Viewed", value: profiles },
+        { label: "Follows", value: follows },
+    ];
+
     return (
-        <ScrollView
-            style={{
-                flex: 1,
-                backgroundColor: "#0B0F19",
-            }}
-        >
-            <View
-                style={{
-                    padding: 20,
-                    marginTop: 50,
-                }}
-            >
-                <Text
-                    style={{
-                        color: "white",
-                        fontSize: 30,
-                        fontWeight: "bold",
-                    }}
-                >
-                    Analytics
-                </Text>
+        <ScrollView style={{ flex: 1, backgroundColor: T.bg }}>
+            <Header title="Analytics" subtitle="FeedFlow performance" />
 
-                <Text
-                    style={{
-                        color: "#94A3B8",
-                        marginTop: 5,
-                    }}
-                >
-                    Personalization performance
-                </Text>
-            </View>
+            <View style={{ paddingHorizontal: 16 }}>
 
-            <View
-                style={{
-                    backgroundColor: "#141B2D",
-                    margin: 20,
-                    borderRadius: 24,
-                    padding: 20,
-                }}
-            >
-                <Text
-                    style={{
-                        color: "white",
-                        fontSize: 20,
-                        fontWeight: "bold",
-                        marginBottom: 20,
-                    }}
-                >
-                    Feed Improvement
-                </Text>
+                {/* Total */}
+                <Card>
+                    <SectionLabel>Total Actions Today</SectionLabel>
+                    <Text style={{ color: T.text, fontSize: 36, fontWeight: "600" }}>
+                        {actionsToday}
+                    </Text>
+                </Card>
 
-                <LineChart
-                    data={{
-                        labels: ["D1", "D3", "D5", "D7"],
-                        datasets: [
-                            {
-                                data: [42, 56, 67, 78],
-                            },
-                        ],
-                    }}
-                    width={screenWidth - 80}
-                    height={220}
-                    yAxisSuffix="%"
-                    chartConfig={{
-                        backgroundColor: "#141B2D",
-                        backgroundGradientFrom: "#141B2D",
-                        backgroundGradientTo: "#141B2D",
-                        decimalPlaces: 0,
-                        color: (opacity = 1) =>
-                            `rgba(124,58,237,${opacity})`,
-                        labelColor: (opacity = 1) =>
-                            `rgba(255,255,255,${opacity})`,
-                    }}
-                    bezier
-                    style={{
-                        borderRadius: 16,
-                    }}
-                />
-            </View>
+                {/* Chart */}
+                <Card>
+                    <SectionLabel>Activity Breakdown</SectionLabel>
+                    <LineChart
+                        data={{
+                            labels: ["Likes", "Reels", "Saves", "Profiles"],
+                            datasets: [{ data: [likes, reels, saves, profiles] }],
+                        }}
+                        width={W - 64}
+                        height={180}
+                        chartConfig={{
+                            backgroundColor: T.surface,
+                            backgroundGradientFrom: T.surface,
+                            backgroundGradientTo: T.surface,
+                            decimalPlaces: 0,
+                            color: (o = 1) => `rgba(165,180,252,${o})`,
+                            labelColor: (o = 1) => `rgba(100,116,139,${o})`,
+                        }}
+                        bezier
+                        style={{ borderRadius: 8, marginTop: 4 }}
+                    />
+                </Card>
 
-            <View
-                style={{
-                    marginHorizontal: 20,
-                }}
-            >
-                {[
-                    "Day 1 - Feed Alignment 42%",
-                    "Day 3 - Feed Alignment 56%",
-                    "Day 5 - Feed Alignment 67%",
-                    "Day 7 - Feed Alignment 78%",
-                ].map((item, index) => (
+                {/* Stat rows */}
+                <SectionLabel>Breakdown</SectionLabel>
+                {STATS.map((item, i) => (
                     <View
-                        key={index}
+                        key={i}
                         style={{
-                            backgroundColor: "#141B2D",
-                            padding: 16,
-                            borderRadius: 16,
-                            marginBottom: 12,
+                            flexDirection: "row",
+                            justifyContent: "space-between",
+                            alignItems: "center",
+                            paddingVertical: 12,
+                            borderBottomWidth: 0.5,
+                            borderBottomColor: T.border,
                         }}
                     >
-                        <Text
-                            style={{
-                                color: "white",
-                            }}
-                        >
-                            {item}
-                        </Text>
+                        <Text style={{ color: T.muted, fontSize: 13 }}>{item.label}</Text>
+                        <Text style={{ color: T.text, fontSize: 16, fontWeight: "600" }}>{item.value}</Text>
                     </View>
                 ))}
+
+                <View style={{ height: 40 }} />
             </View>
         </ScrollView>
     );

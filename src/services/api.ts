@@ -1,4 +1,4 @@
-const API_URL = "http://192.168.20.12:5000";
+const API_URL = "https://backend-feedflow.onrender.com";
 
 // ─── Instagram Session ───
 
@@ -135,6 +135,8 @@ export async function stopAutomation(instagram_username: string) {
     return response.json();
 }
 
+
+
 // ─── Analytics ───
 
 export async function getAnalytics(username: string) {
@@ -149,6 +151,31 @@ export async function verifyCreator(
     const response =
         await fetch(
             `${API_URL}/creator-verify/${username}`
+        );
+
+    return response.json();
+}
+export async function updateCycleSettings(
+    instagram_username: string,
+    auto_cycle_enabled: boolean,
+    cycle_interval_hours: number
+) {
+
+    const response =
+        await fetch(
+            `${API_URL}/automation/cycle-settings`,
+            {
+                method: "POST",
+                headers: {
+                    "Content-Type":
+                        "application/json",
+                },
+                body: JSON.stringify({
+                    instagram_username,
+                    auto_cycle_enabled,
+                    cycle_interval_hours,
+                }),
+            }
         );
 
     return response.json();

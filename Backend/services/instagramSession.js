@@ -169,10 +169,8 @@ class InstagramSession {
         await this._humanDelay(800, 1500);
 
         // ── FIXED: Better login button click ──
-        // Instagram's login button can be a button[type="submit"] or a div[role="button"]
         let loginClicked = false;
 
-        // Strategy 1: Try button[type="submit"]
         let loginBtn = await this.page.$('button[type="submit"]');
         if (loginBtn) {
             const isDisabled = await loginBtn.getAttribute("disabled");
@@ -182,14 +180,12 @@ class InstagramSession {
             }
         }
 
-        // Strategy 2: Try the login div with role="button"
         if (!loginClicked) {
             loginBtn = await this.page.$('div[role="button"]:has-text("Log in")');
             if (!loginBtn) {
                 loginBtn = await this.page.$('button:has-text("Log in")');
             }
             if (!loginBtn) {
-                // Last resort: find any visible button inside the form
                 loginBtn = await this.page.$('form input[type="submit"], form button');
             }
             if (loginBtn) {
@@ -199,7 +195,6 @@ class InstagramSession {
         }
 
         if (!loginClicked) {
-            // Fallback: press Enter on the password field
             await this.page.keyboard.press("Enter");
         }
 
@@ -231,7 +226,6 @@ class InstagramSession {
             await this._humanDelay(1000, 2000);
         } catch { }
 
-        // Check login success — use multiple signals
         const loggedIn = await this.page.evaluate(() => {
             return (
                 document.querySelector('[aria-label="Home"]') !== null ||
@@ -264,7 +258,6 @@ class InstagramSession {
             return { success: true, method: "fresh_login" };
         }
 
-        // Check for 2FA
         try {
             const challengeInput = await this.page.$("input#security_code");
             if (challengeInput) {
@@ -279,7 +272,6 @@ class InstagramSession {
             }
         } catch { }
 
-        // Check for suspicious login attempt
         const pageText = await this.page.textContent("body");
         if (pageText.includes("suspicious") || pageText.includes("unusual")) {
             this._emitStatus("suspicious_login");
@@ -290,7 +282,6 @@ class InstagramSession {
         }
 
         this._emitStatus("login_failed");
-        // Take screenshot for debugging
         try {
             await this.page.screenshot({
                 path: `login_failed_${username}.png`,
@@ -316,7 +307,6 @@ class InstagramSession {
             await this._humanType(this.page, code);
             await this._humanDelay(1000, 2000);
 
-            // Try clicking submit button
             let submitClicked = false;
             const submitBtn = await this.page.$('button[type="button"]');
             if (submitBtn) {
@@ -329,7 +319,6 @@ class InstagramSession {
 
             await this._humanDelay(5000, 8000);
 
-            // Handle post-challenge popups
             try {
                 const notNow = await this.page.$(
                     "button:has-text('Not now')"
@@ -376,8 +365,25 @@ class InstagramSession {
     }
 
     // ──────────────────────────────────────────────
-    //  ACTIONS
+    //  ACTIONS — UPDATED with random post selection + 1-3 range
     // ──────────────────────────────────────────────
+
+    // ─── Helper: Pick random post/reel from grid ───
+    async _pickRandomGridPost() {
+        const postLinks = await this.page.$$('article a[href*="/p/"], article a[href*="/reel/"]');
+        if (postLinks.length > 0) {
+            const idx = Math.floor(Math.random() * postLinks.length);
+            return postLinks[idx];
+        }
+
+        const allLinks = await this.page.$$('a[href*="/p/"], a[href*="/reel/"]');
+        if (allLinks.length > 0) {
+            const idx = Math.floor(Math.random() * allLinks.length);
+            return allLinks[idx];
+        }
+
+        return null;
+    }
 
     // ─── Action: view_profile ───
     async visitProfile(targetUsername) {
@@ -392,13 +398,11 @@ class InstagramSession {
             );
             await this._humanDelay(3000, 5000);
 
-            // Scroll to simulate browsing
             for (let i = 0; i < 3; i++) {
                 await this.page.evaluate(() => window.scrollBy(0, 400));
                 await this._humanDelay(800, 1500);
             }
 
-            // Hover over a couple posts
             const postLinks = await this.page.$$('article a');
             if (postLinks.length > 0) {
                 const hoverTarget = postLinks[Math.floor(Math.random() * Math.min(postLinks.length, 6))];
@@ -419,8 +423,8 @@ class InstagramSession {
         }
     }
 
-    // ─── Action: watch_reel ───
-    async watchReels(targetUsername, count = 1) {
+    // ─── Action: watch_reel — UPDATED: random reel each time ───
+    async watchReels(targetUsername, count = 2) {
         let watched = 0;
         try {
             console.log(`  🎬 [watch_reel] @${targetUsername}`);
@@ -433,43 +437,45 @@ class InstagramSession {
             );
             await this._humanDelay(3000, 5000);
 
-            // Wait for video elements to load
-            try {
-                await this.page.waitForSelector('video', {
-                    timeout: 12000,
-                });
-                console.log(`  📹 Video element found`);
-            } catch {
-                console.log(`  ⚠️  No video found for @${targetUsername}`);
-            }
-
             for (let i = 0; i < count; i++) {
-                // Wait for video to actually start playing
+                console.log(`  🔄 Reel ${i + 1}/${count}...`);
+
+                // Pick a random reel from the grid each time
+                const randomReel = await this._pickRandomGridPost();
+                if (!randomReel) {
+                    console.log(`  ⚠️  No reels found`);
+                    break;
+                }
+
+                await randomReel.click();
+                await this._humanDelay(3000, 5000);
+
+                try {
+                    await this.page.waitForSelector('[role="dialog"]', { timeout: 8000 });
+                } catch { }
+                await this._humanDelay(1000, 2000);
+
                 try {
                     await this.page.waitForFunction(() => {
                         const video = document.querySelector('video');
                         return video && !video.paused && video.currentTime > 0;
                     }, { timeout: 8000 });
                 } catch {
-                    // Try clicking play if autoplay failed
                     try {
                         const playBtn = await this.page.$('button[aria-label="Play"]');
                         if (playBtn) await playBtn.click();
                     } catch { }
                 }
 
-                // Watch the reel for a realistic duration (10-25 seconds)
                 const watchTime = Math.floor(Math.random() * 15000) + 10000;
                 console.log(`  ⏯️  Watching reel ${i + 1}/${count} for ${(watchTime / 1000).toFixed(1)}s`);
                 await new Promise(r => setTimeout(r, watchTime));
 
-                // Like ~40% of reels
                 if (Math.random() < 0.4) {
                     const liked = await this._likeCurrentPost();
                     if (liked) console.log(`  ❤️  Liked reel`);
                 }
 
-                // Save ~15% of reels
                 if (Math.random() < 0.15) {
                     const saved = await this._saveCurrentPost();
                     if (saved) console.log(`  💾 Saved reel`);
@@ -477,19 +483,16 @@ class InstagramSession {
 
                 watched++;
 
-                // Navigate to next reel
                 if (i < count - 1) {
-                    // Simulate swipe up or press down arrow
-                    await this.page.keyboard.press("ArrowDown");
-                    await this._humanDelay(2000, 4000);
+                    await this._closeDialog();
+                    await this._humanDelay(2000, 3000);
 
-                    // Wait for new video to load
-                    try {
-                        await this.page.waitForFunction(() => {
-                            const video = document.querySelector('video');
-                            return video && video.currentTime > 0;
-                        }, { timeout: 8000 });
-                    } catch { }
+                    // Re-navigate to reels tab for fresh grid
+                    await this.page.goto(
+                        `https://www.instagram.com/${targetUsername}/reels/`,
+                        { timeout: 20000, waitUntil: "networkidle" }
+                    );
+                    await this._humanDelay(2000, 4000);
                 }
             }
 
@@ -504,43 +507,45 @@ class InstagramSession {
         }
     }
 
-    // ─── Action: like_post ───
+    // ─── Action: like_post — UPDATED: 1-3 random posts ───
     async likeRecentPost(targetUsername) {
+        const likeCount = Math.floor(Math.random() * 3) + 1; // 1-3
+        let liked = 0;
         try {
-            console.log(`  ❤️  [like_post] @${targetUsername}`);
-            await this.page.goto(
-                `https://www.instagram.com/${targetUsername}/`,
-                {
-                    timeout: 20000,
-                    waitUntil: "networkidle",
+            console.log(`  ❤️  [like_post] @${targetUsername} (${likeCount} posts)`);
+
+            for (let i = 0; i < likeCount; i++) {
+                console.log(`  🔄 Post ${i + 1}/${likeCount}...`);
+
+                await this.page.goto(
+                    `https://www.instagram.com/${targetUsername}/`,
+                    { timeout: 20000, waitUntil: "networkidle" }
+                );
+                await this._humanDelay(2000, 4000);
+
+                const randomPost = await this._pickRandomGridPost();
+                if (!randomPost) {
+                    console.log(`  ⚠️  No posts found`);
+                    break;
                 }
-            );
-            await this._humanDelay(2000, 4000);
 
-            // Click on the first post
-            const posts = await this.page.$$("article a");
-            if (posts.length === 0) {
-                return { success: false, error: "No posts found" };
+                await randomPost.click();
+                await this._humanDelay(3000, 5000);
+
+                try {
+                    await this.page.waitForSelector('[role="dialog"]', { timeout: 8000 });
+                } catch { }
+                await this._humanDelay(1000, 2000);
+
+                const likedThis = await this._likeCurrentPost();
+                if (likedThis) {
+                    liked++;
+                    console.log(`  ❤️  Liked post ${i + 1}`);
+                }
+
+                await this._closeDialog();
+                await this._humanDelay(1500, 3000);
             }
-
-            await posts[0].click();
-            await this._humanDelay(2000, 4000);
-
-            // Wait for post dialog
-            try {
-                await this.page.waitForSelector('[role="dialog"]', {
-                    timeout: 8000,
-                });
-            } catch { }
-
-            await this._humanDelay(1000, 2000);
-
-            const liked = await this._likeCurrentPost();
-
-            // Close dialog
-            const closeBtn = await this.page.$('svg[aria-label="Close"]');
-            if (closeBtn) await closeBtn.click();
-            await this._humanDelay(1000, 2000);
 
             return {
                 success: true,
@@ -549,47 +554,49 @@ class InstagramSession {
                 liked,
             };
         } catch (e) {
-            return { success: false, error: e.message };
+            return { success: true, action: "like_post", target: targetUsername, liked, error: e.message };
         }
     }
 
-    // ─── FIXED & IMPROVED: save_post ───
+    // ─── Action: save_post — UPDATED: 1-3 random posts ───
     async saveRecentPost(targetUsername) {
+        const saveCount = Math.floor(Math.random() * 3) + 1; // 1-3
+        let saved = 0;
         try {
-            console.log(`  💾 [save_post] @${targetUsername}`);
-            await this.page.goto(
-                `https://www.instagram.com/${targetUsername}/`,
-                {
-                    timeout: 20000,
-                    waitUntil: "networkidle",
+            console.log(`  💾 [save_post] @${targetUsername} (${saveCount} posts)`);
+
+            for (let i = 0; i < saveCount; i++) {
+                console.log(`  🔄 Post ${i + 1}/${saveCount}...`);
+
+                await this.page.goto(
+                    `https://www.instagram.com/${targetUsername}/`,
+                    { timeout: 20000, waitUntil: "networkidle" }
+                );
+                await this._humanDelay(2000, 4000);
+
+                const randomPost = await this._pickRandomGridPost();
+                if (!randomPost) {
+                    console.log(`  ⚠️  No posts found`);
+                    break;
                 }
-            );
-            await this._humanDelay(2000, 4000);
 
-            // Click on the first post
-            const posts = await this.page.$$("article a");
-            if (posts.length === 0) {
-                return { success: false, error: "No posts found" };
+                await randomPost.click();
+                await this._humanDelay(3000, 5000);
+
+                try {
+                    await this.page.waitForSelector('[role="dialog"]', { timeout: 8000 });
+                } catch { }
+                await this._humanDelay(1000, 2000);
+
+                const savedThis = await this._saveCurrentPost();
+                if (savedThis) {
+                    saved++;
+                    console.log(`  💾 Saved post ${i + 1}`);
+                }
+
+                await this._closeDialog();
+                await this._humanDelay(1500, 3000);
             }
-
-            await posts[0].click();
-            await this._humanDelay(2000, 4000);
-
-            // Wait for post dialog
-            try {
-                await this.page.waitForSelector('[role="dialog"]', {
-                    timeout: 8000,
-                });
-            } catch { }
-
-            await this._humanDelay(1000, 2000);
-
-            const saved = await this._saveCurrentPost();
-
-            // Close dialog
-            const closeBtn = await this.page.$('svg[aria-label="Close"]');
-            if (closeBtn) await closeBtn.click();
-            await this._humanDelay(1000, 2000);
 
             return {
                 success: true,
@@ -602,34 +609,42 @@ class InstagramSession {
                 success: true,
                 action: "save_post",
                 target: targetUsername,
-                saved: false,
+                saved,
                 warning: e.message,
             };
         }
     }
 
-    // ─── Action: follow ───
+    // ─── Action: follow — UPDATED: random post first, then follow ───
     async followUser(targetUsername) {
         try {
             console.log(`  ➕ [follow] @${targetUsername}`);
+
+            // First browse profile and like a random post before following
             await this.page.goto(
                 `https://www.instagram.com/${targetUsername}/`,
-                {
-                    timeout: 20000,
-                    waitUntil: "networkidle",
-                }
+                { timeout: 20000, waitUntil: "networkidle" }
             );
             await this._humanDelay(3000, 5000);
 
-            // Find the Follow button
-            const followBtn = await this.page.$(
-                'button:has-text("Follow")'
-            );
+            // Like a random post first (more natural behavior)
+            const randomPost = await this._pickRandomGridPost();
+            if (randomPost) {
+                await randomPost.click();
+                await this._humanDelay(2000, 4000);
+                try {
+                    await this.page.waitForSelector('[role="dialog"]', { timeout: 8000 });
+                } catch { }
+                await this._humanDelay(1000, 2000);
+                await this._likeCurrentPost();
+                await this._closeDialog();
+                await this._humanDelay(2000, 3000);
+            }
+
+            // Now find the Follow button
+            const followBtn = await this.page.$('button:has-text("Follow")');
             if (!followBtn) {
-                // Check if already following
-                const followingBtn = await this.page.$(
-                    'button:has-text("Following")'
-                );
+                const followingBtn = await this.page.$('button:has-text("Following")');
                 if (followingBtn) {
                     console.log(`  ℹ️  Already following @${targetUsername}`);
                     return {
@@ -639,11 +654,21 @@ class InstagramSession {
                         alreadyFollowing: true,
                     };
                 }
+                const requestedBtn = await this.page.$('button:has-text("Requested")');
+                if (requestedBtn) {
+                    console.log(`  ℹ️  Already requested @${targetUsername}`);
+                    return {
+                        success: true,
+                        action: "follow",
+                        target: targetUsername,
+                        alreadyRequested: true,
+                    };
+                }
                 return { success: false, error: "Follow button not found" };
             }
 
             const btnText = await followBtn.textContent();
-            if (btnText.includes("Following")) {
+            if (btnText.includes("Following") || btnText.includes("Requested")) {
                 return {
                     success: true,
                     action: "follow",
@@ -679,7 +704,6 @@ class InstagramSession {
             );
             await this._humanDelay(3000, 5000);
 
-            // Find the Following button
             const followingBtn = await this.page.$(
                 'button:has-text("Following")'
             );
@@ -690,7 +714,6 @@ class InstagramSession {
             await followingBtn.click();
             await this._humanDelay(1000, 2000);
 
-            // Confirm unfollow in the popup
             const confirmBtn = await this.page.$(
                 'button:has-text("Unfollow")'
             );
@@ -736,13 +759,12 @@ class InstagramSession {
             );
             await this._humanDelay(2000, 4000);
 
-            // Click on the first post
-            const posts = await this.page.$$("article a");
-            if (posts.length === 0) {
+            const randomPost = await this._pickRandomGridPost();
+            if (!randomPost) {
                 return { success: false, error: "No posts found" };
             }
 
-            await posts[0].click();
+            await randomPost.click();
             await this._humanDelay(2000, 4000);
 
             try {
@@ -753,7 +775,6 @@ class InstagramSession {
 
             await this._humanDelay(1000, 2000);
 
-            // Find the comment input
             const commentInput = await this.page.$(
                 'textarea[aria-label="Add a comment…"], input[aria-label="Add a comment…"]'
             );
@@ -767,7 +788,6 @@ class InstagramSession {
             await this._humanType(this.page, text);
             await this._humanDelay(1000, 2000);
 
-            // Press Enter to post
             await this.page.keyboard.press("Enter");
             await this._humanDelay(2000, 4000);
 
@@ -787,29 +807,35 @@ class InstagramSession {
     // ─── Helper: Like current post ───
     async _likeCurrentPost() {
         try {
-            // Check if already liked
             const unlikeBtn = await this.page.$(
                 'svg[aria-label="Unlike"]'
             );
             if (unlikeBtn) return false;
 
-            // Try to find and click the Like button
+            const unlikeRoleBtn = await this.page.$('div[role="button"] svg[aria-label="Unlike"]');
+            if (unlikeRoleBtn) return false;
+
             const likeBtn = await this.page.$(
                 'svg[aria-label="Like"]'
             );
             if (likeBtn) {
-                // Instagram sometimes wraps the SVG in a button
                 await likeBtn.click();
                 await this._humanDelay(500, 1500);
                 return true;
             }
 
-            // Fallback: click the heart button by role
             const heartBtn = await this.page.$(
                 'button:has(svg[aria-label="Like"])'
             );
             if (heartBtn) {
                 await heartBtn.click();
+                await this._humanDelay(500, 1500);
+                return true;
+            }
+
+            const roleBtn = await this.page.$('div[role="button"] svg[aria-label="Like"]');
+            if (roleBtn) {
+                await roleBtn.click();
                 await this._humanDelay(500, 1500);
                 return true;
             }
@@ -823,13 +849,14 @@ class InstagramSession {
     // ─── Helper: Save current post ───
     async _saveCurrentPost() {
         try {
-            // Check if already saved
             const savedIndicator = await this.page.$(
                 'svg[aria-label="Saved"]'
             );
             if (savedIndicator) return false;
 
-            // Click the Save button (bookmark icon)
+            const savedRoleBtn = await this.page.$('div[role="button"] svg[aria-label="Saved"]');
+            if (savedRoleBtn) return false;
+
             const saveBtn = await this.page.$(
                 'svg[aria-label="Save"]'
             );
@@ -839,7 +866,6 @@ class InstagramSession {
                 return true;
             }
 
-            // Fallback: find save button wrapping the SVG
             const bookmarkBtn = await this.page.$(
                 'button:has(svg[aria-label="Save"])'
             );
@@ -849,7 +875,13 @@ class InstagramSession {
                 return true;
             }
 
-            // Ultra fallback: try clicking the bookmark icon at the bottom of post
+            const roleBtn = await this.page.$('div[role="button"] svg[aria-label="Save"]');
+            if (roleBtn) {
+                await roleBtn.click();
+                await this._humanDelay(1000, 2000);
+                return true;
+            }
+
             const allBookmarks = await this.page.$$(
                 'svg[aria-label="Save"], svg[aria-label="Saved"]'
             );
@@ -880,7 +912,6 @@ class InstagramSession {
                 return;
             }
 
-            // Fallback: press Escape
             await this.page.keyboard.press("Escape");
             await this._humanDelay(500, 1000);
         } catch {
