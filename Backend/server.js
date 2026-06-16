@@ -13,6 +13,14 @@ const automationRoutes = require("./routes/automation");
 const schedulerRoutes = require("./routes/scheduler");
 const analyticsRoutes = require("./routes/analytics");
 const instagramSessionRoutes = require("./routes/connectInstagram");
+const cron =
+    require("node-cron");
+
+const {
+    runScheduler,
+} = require(
+    "./services/schedulerService"
+);
 
 
 
@@ -42,5 +50,32 @@ app.listen(
     process.env.PORT || 5000,
     () => {
         console.log("Server running");
+    }
+);
+cron.schedule(
+    "*/15 * * * * *",
+    async () => {
+
+        try {
+
+            const result =
+                await runScheduler();
+
+            console.log(
+                `⏰ Scheduler Tick (${result.processed} processed)`
+            );
+
+        } catch (err) {
+
+            console.error(
+                "CRON ERROR:"
+            );
+
+            console.error(
+                err.message
+            );
+
+        }
+
     }
 );

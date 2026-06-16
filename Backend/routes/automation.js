@@ -57,6 +57,8 @@ router.post(
                 "view_profile",
                 "watch_reel",
                 "save_post",
+                "like_post",
+                "follow",
             ];
 
             const jobs = [];
@@ -79,9 +81,7 @@ router.post(
 
                 const delaySeconds =
                     Math.floor(
-                        Math.random() *
-                        21
-                    ) + 10;
+                        Math.random() * 5) + 3
 
                 currentTime =
                     new Date(

@@ -1,137 +1,125 @@
-const { chromium } =
-    require("playwright");
-
-const path =
-    require("path");
-
-const fs =
-    require("fs");
-
 const supabase =
     require("./supabase");
-
 
 async function connectInstagram(
     username
 ) {
 
-    const browser =
-        await chromium.launch({
-            headless: false,
-        });
+    try {
 
-    const context =
-        await browser.newContext();
+        const {
+            data,
+            error,
+        } = await supabase
+            .from(
+                "instagram_accounts"
+            )
+            .upsert([
+                {
+                    instagram_username:
+                        username,
 
-    const page =
-        await context.newPage();
+                    status:
+                        "connected",
 
-    await page.goto(
-        "https://www.instagram.com/"
-    );
+                    automation_status:
+                        "stopped",
 
-    console.log(
-        "Login to Instagram..."
-    );
+                    session_connected:
+                        true,
 
-    await page.waitForURL(
-        "**instagram.com/**",
-        {
-            timeout: 300000,
-        }
-    );
+                    session_file:
+                        "simulation",
 
-    const sessionPath =
-        path.join(
-            __dirname,
-            "../sessions",
-            `${username}.json`
+                    connected_at:
+                        new Date()
+                            .toISOString(),
+
+                    last_sync:
+                        new Date()
+                            .toISOString(),
+                },
+            ])
+            .select();
+
+        if (error)
+            throw error;
+
+        console.log(
+            `✅ Simulated Instagram connection for ${username}`
         );
 
-    await context.storageState({
-        path: sessionPath,
-    });
-    await supabase
-        .from(
-            "instagram_accounts"
-        )
-        .update({
-            session_connected:
-                true,
+        return {
+            success: true,
+            simulated: true,
+            account:
+                data?.[0] || null,
+        };
 
-            session_file:
-                `${username}.json`,
+    } catch (err) {
 
-            connected_at:
-                new Date(),
-        })
-        .eq(
-            "instagram_username",
-            username
+        console.error(
+            "Simulation connect error:",
+            err
         );
 
-    await browser.close();
+        return {
+            success: false,
+            error:
+                err.message,
+        };
 
-    return {
-        success: true,
-        sessionFile:
-            `${username}.json`,
-    };
-
-
+    }
 
 }
+
 async function verifySession(
     username
 ) {
 
-    const sessionPath =
-        path.join(
-            __dirname,
-            "../sessions",
-            `${username}.json`
-        );
+    try {
 
-    if (
-        !fs.existsSync(
-            sessionPath
-        )
-    ) {
+        const {
+            data,
+            error,
+        } = await supabase
+            .from(
+                "instagram_accounts"
+            )
+            .select(
+                "session_connected"
+            )
+            .eq(
+                "instagram_username",
+                username
+            )
+            .single();
+
+        if (
+            error ||
+            !data
+        ) {
+
+            return {
+                valid: false,
+            };
+
+        }
+
+        return {
+            valid:
+                data.session_connected ===
+                true,
+        };
+
+    } catch (err) {
 
         return {
             valid: false,
         };
+
     }
 
-    const browser =
-        await chromium.launch({
-            headless: true,
-        });
-
-    const context =
-        await browser.newContext({
-            storageState:
-                sessionPath,
-        });
-
-    const page =
-        await context.newPage();
-
-    await page.goto(
-        "https://www.instagram.com/"
-    );
-
-    const url =
-        page.url();
-
-    await browser.close();
-
-    return {
-        valid:
-            !url.includes(
-                "accounts/login"
-            ),
-    };
 }
 
 module.exports = {

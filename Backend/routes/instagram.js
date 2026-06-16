@@ -1,39 +1,17 @@
 const express = require("express");
 const router = express.Router();
 
-const validateInstagram =
-    require("../services/instagramValidator");
-
 const supabase =
     require("../services/supabase");
 
 router.post(
     "/connect",
     async (req, res) => {
+
         try {
 
-            const {
-                username,
-                session_cookie,
-            } = req.body;
-
-            const validation =
-                await validateInstagram(
-                    username,
-                    session_cookie
-                );
-
-            if (
-                !validation.valid
-            ) {
-                return res
-                    .status(400)
-                    .json({
-                        success: false,
-                        error:
-                            "Invalid Instagram session",
-                    });
-            }
+            const { username } =
+                req.body;
 
             const {
                 data,
@@ -46,11 +24,23 @@ router.post(
                     {
                         instagram_username:
                             username,
-                        session_cookie,
+
                         status:
                             "connected",
+
+                        session_connected:
+                            true,
+
+                        automation_status:
+                            "stopped",
+
+                        connected_at:
+                            new Date()
+                                .toISOString(),
+
                         last_sync:
-                            new Date(),
+                            new Date()
+                                .toISOString(),
                     },
                     {
                         onConflict:
@@ -62,24 +52,50 @@ router.post(
             if (error)
                 throw error;
 
+            // Demo interests
+            await supabase
+                .from("preferences")
+                .upsert([
+                    {
+                        instagram_username:
+                            username,
+                        interest: "AI",
+                        weight: 10,
+                    },
+                    {
+                        instagram_username:
+                            username,
+                        interest:
+                            "Cybersecurity",
+                        weight: 10,
+                    },
+                    {
+                        instagram_username:
+                            username,
+                        interest:
+                            "Startups",
+                        weight: 10,
+                    },
+                ]);
+
             res.json({
                 success: true,
+                simulated: true,
                 data,
             });
 
         } catch (err) {
 
-            console.error(
-                err
-            );
+            console.error(err);
 
-            res.status(500)
-                .json({
-                    success: false,
-                    error:
-                        err.message,
-                });
+            res.status(500).json({
+                success: false,
+                error:
+                    err.message,
+            });
+
         }
+
     }
 );
 
