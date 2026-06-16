@@ -51,22 +51,6 @@ router.get(
                         "view_profile"
                 ).length;
 
-            const likes =
-                logs.filter(
-                    (log) =>
-                        log.action ===
-                        "like_post"
-                ).length;
-
-            const follows =
-                logs.filter(
-                    (log) =>
-                        log.action ===
-                        "follow"
-                ).length;
-
-
-
             res.json({
                 success: true,
                 actionsToday,
@@ -74,8 +58,6 @@ router.get(
                 saves,
                 profiles,
                 logs,
-                likes,
-                follows,
             });
 
         } catch (err) {

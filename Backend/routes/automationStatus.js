@@ -20,12 +20,9 @@ router.get(
                 .from(
                     "instagram_accounts"
                 )
-                .select(`
-        automation_status,
-        auto_cycle_enabled,
-        cycle_interval_hours,
-        last_cycle_completed
-    `)
+                .select(
+                    "automation_status"
+                )
                 .eq(
                     "instagram_username",
                     username
@@ -98,23 +95,10 @@ router.get(
 
             res.json({
                 success: true,
-
                 automationStatus:
                     account.automation_status,
-
                 pendingJobs,
-
                 completedJobs,
-
-                autoCycleEnabled:
-                    account.auto_cycle_enabled,
-
-                cycleIntervalHours:
-                    account.cycle_interval_hours,
-
-                lastCycleCompleted:
-                    account.last_cycle_completed,
-
                 nextJob:
                     nextJob?.[0] || null,
             });
